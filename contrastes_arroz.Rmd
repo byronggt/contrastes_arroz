@@ -1,0 +1,238 @@
+---
+title: "ANOVA y contrastes ortogonales para la producción de arroz"
+author: "Dr. Byron González"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    code_folding: show
+    theme: readable
+---
+
+# Introducción
+
+Este documento presenta un análisis de varianza (ANOVA) para comparar la producción de arroz entre tratamientos y, posteriormente, descomponer la variación entre medias mediante contrastes ortogonales. El análisis utiliza los datos almacenados en `data/arrozcontrast.xlsx`.
+
+La estrategia es:
+
+1. Importar y revisar los datos;
+2. Convertir el tratamiento en un factor;
+3. Ajustar el ANOVA global;
+4. Definir contrastes que respondan preguntas específicas;
+5. Comprobar que los contrastes sean ortogonales;
+6. Estimar e interpretar cada comparación.
+
+# Preparación
+
+## Paquetes
+
+Se cargan los paquetes necesarios. `readxl` importa el archivo de Excel, `car` ofrece herramientas auxiliares para diagnóstico, y `multcomp` permite probar contrastes lineales mediante `glht()`. `dplyr` queda disponible para posibles resúmenes descriptivos.
+
+```{r paquetes, message=FALSE, warning=FALSE}
+paquetes <- c("readxl", "dplyr", "car", "multcomp")
+
+instalar_si_falta <- function(paquete) {
+  if (!requireNamespace(paquete, quietly = TRUE)) {
+    install.packages(paquete)
+  }
+}
+
+invisible(lapply(paquetes, instalar_si_falta))
+invisible(lapply(paquetes, library, character.only = TRUE))
+```
+
+## Importación y revisión inicial
+
+Se lee la hoja de cálculo ubicada en la misma carpeta que este documento y se muestran las primeras observaciones. La variable respuesta es `prod_arroz`; `rep` identifica la repetición y `trat` identifica el tratamiento.
+
+```{r importar-datos}
+arrozc <- read_excel("arrozcontrast.xlsx")
+head(arrozc)
+str(arrozc)
+summary(arrozc)
+```
+
+# Organización de las variables
+
+ANOVA necesita que el tratamiento se interprete como una variable categórica. La conversión a factor evita que R trate sus códigos como valores numéricos con una relación lineal. La repetición también se convierte en factor para conservar su papel de identificador experimental.
+
+```{r convertir-factores}
+arrozc$rep <- as.factor(arrozc$rep)
+arrozc$trat <- as.factor(arrozc$trat)
+
+levels(arrozc$trat)
+table(arrozc$trat)
+```
+
+# ANOVA de un factor
+
+## Modelo estadístico
+
+El modelo ajustado es:
+
+$$
+Y_{ij} = \mu + \tau_i + \varepsilon_{ij},
+$$
+
+where $Y_{ij}$ es la producción observada, $\mu$ es la media general, $\tau_i$ es el efecto del tratamiento $i$ y $\varepsilon_{ij}$ es el error aleatorio.
+
+La hipótesis global es:
+
+- $H_0$: todas las medias de tratamiento son iguales;
+- $H_A$: al menos una media de tratamiento difiere.
+
+El siguiente chunk ajusta el modelo y muestra la tabla ANOVA. Este contraste global responde si existe evidencia de diferencias, pero no indica todavía qué grupos son responsables de ellas.
+
+```{r anova-global}
+modelo <- aov(prod_arroz ~ trat, data = arrozc)
+summary(modelo)
+```
+
+## Medias por tratamiento
+
+Las medias ayudan a contextualizar los contrastes posteriores. No sustituyen la prueba inferencial, porque la decisión debe considerar también la variabilidad residual y los grados de libertad del modelo.
+
+```{r medias-tratamiento}
+aggregate(prod_arroz ~ trat, data = arrozc, FUN = mean)
+aggregate(prod_arroz ~ trat, data = arrozc, FUN = sd)
+```
+
+## Diagnóstico básico
+
+Los supuestos habituales del ANOVA son independencia, normalidad aproximada de los residuos y homogeneidad de varianzas. Los gráficos permiten detectar patrones que justificarían una revisión del modelo.
+
+```{r diagnostico, fig.width=8, fig.height=5}
+par(mfrow = c(1, 2))
+plot(modelo, which = 1)
+plot(modelo, which = 2)
+par(mfrow = c(1, 1))
+```
+
+# Contrastes ortogonales
+
+## Qué es un contraste
+
+Un contraste lineal de las medias de tratamiento tiene la forma:
+
+$$
+L = \sum_{i=1}^{k} c_i\bar{Y}_i,
+$$
+
+con la restricción $\sum_i c_i = 0$. Los coeficientes $c_i$ determinan qué medias se comparan y con qué ponderación.
+
+En este análisis se plantean cuatro preguntas:
+
+| Contraste | Comparación | Coeficientes |
+|:--|:--|:--|
+| C1 | Nitratos frente a urea y sulfato | $(2, 2, 2, -3, -3)$ |
+| C2 | Nitrato de calcio y sodio frente a nitrato de amonio | $(1, 1, -2, 0, 0)$ |
+| C3 | Nitrato de calcio frente a nitrato de sodio | $(1, -1, 0, 0, 0)$ |
+| C4 | Urea frente a sulfato | $(0, 0, 0, 1, -1)$ |
+
+El orden de los coeficientes es el orden de `levels(arrozc$trat)`. Por ello, conviene revisar los niveles antes de interpretar los signos o las etiquetas.
+
+## Construcción de la matriz
+
+Cada fila representa un contraste y cada columna corresponde a un nivel del tratamiento. La suma de cada fila debe ser cero; así se garantiza que cada fila sea una comparación de medias y no una combinación que incluya la media general.
+
+```{r matriz-contrastes}
+contrastes <- matrix(c(
+  2,  2,  2, -3, -3,  # C1
+  1,  1, -2,  0,  0,   # C2
+  1, -1, 0,  0,  0,   # C3
+  0, 0,  0,  1, -1     # C4
+), nrow = 4, byrow = TRUE)
+
+rownames(contrastes) <- c(
+  "Nitratos vs Urea y Sulfato",
+  "Nitrato Ca y Na vs Nitrato de amonio",
+  "Nitrato Ca vs Nitrato Na",
+  "Urea vs Sulfato"
+)
+colnames(contrastes) <- levels(arrozc$trat)
+contrastes
+```
+
+## Verificación de ortogonalidad
+
+Dos contrastes son ortogonales cuando el producto interno de sus coeficientes es cero:
+
+$$
+\sum_{i=1}^{k} c_i d_i = 0.
+$$
+
+La matriz de productos internos debe ser diagonal. Si además cada contraste suma cero y el número de contrastes independientes es $k-1$, la descomposición cubre toda la variación entre tratamientos.
+
+```{r verificar-ortogonalidad}
+rowSums(contrastes)
+productos_internos <- contrastes %*% t(contrastes)
+productos_internos
+all(rowSums(contrastes) == 0)
+all(productos_internos[upper.tri(productos_internos)] == 0)
+```
+
+# ANOVA descompuesto por contrastes
+
+Para que `aov()` utilice estos contrastes, se asigna la transpuesta de la matriz a la variable factor. R espera una columna por contraste y una fila por nivel del factor.
+
+```{r asignar-contrastes}
+contrasts(arrozc$trat) <- t(contrastes)
+
+modelo_contrastes <- aov(prod_arroz ~ trat, data = arrozc)
+summary(modelo_contrastes)
+```
+
+`split` separa la suma de cuadrados del tratamiento en las cuatro comparaciones nombradas. Cada fila de la tabla resultante evalúa una pregunta experimental concreta.
+
+```{r anova-contrastes}
+summary(
+  modelo_contrastes,
+  split = list(
+    trat = list(
+      "Nitratos vs Urea y Sulfato" = 1,
+      "Nitrato Ca y Na vs Nitrato de amonio" = 2,
+      "Nitrato Ca vs Nitrato Na" = 3,
+      "Urea vs Sulfato" = 4
+    )
+  )
+)
+```
+
+# Estimación e inferencia con `glht()`
+
+`glht()` permite expresar las comparaciones como hipótesis lineales y devuelve la estimación del contraste, su error estándar, el estadístico de prueba y el valor p. El signo de la estimación depende del orden de los coeficientes: un valor positivo favorece los grupos con coeficientes positivos frente a los grupos con coeficientes negativos.
+
+```{r glht-contrastes}
+res_contrastes <- glht(
+  modelo,
+  linfct = mcp(trat = contrastes)
+)
+
+summary(res_contrastes)
+```
+
+En el resultado, un valor p pequeño indica evidencia contra la igualdad de la combinación lineal correspondiente. La interpretación debe hacerse junto con la estimación y su signo, no únicamente con el valor p.
+
+# Conclusiones de lectura
+
+1. El ANOVA global determina si hay diferencias entre las medias de tratamiento.
+2. Los contrastes convierten esa diferencia global en comparaciones planificadas y científicamente interpretables.
+3. La ortogonalidad evita que las comparaciones se solapen en la partición de la suma de cuadrados.
+4. `summary(modelo_contrastes, split = ...)` muestra la descomposición del ANOVA.
+5. `glht()` proporciona la estimación y la prueba inferencial de cada contraste.
+
+La conclusión sustantiva debe completarse con los valores obtenidos al compilar el documento y con el contexto agronómico del experimento.
+
+# Publicación en GitHub Pages
+
+Para generar el archivo que GitHub Pages utilizará como página de inicio, ejecuta el siguiente comando desde la carpeta del proyecto. El parámetro `output_file` cambia el nombre del HTML a `index.html`.
+
+```{r publicar, eval=FALSE}
+rmarkdown::render(
+  "contrastes_arroz.Rmd",
+  output_format = "html_document",
+  output_file = "index.html"
+)
+```
