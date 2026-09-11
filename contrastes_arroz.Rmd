@@ -223,15 +223,3 @@ En el resultado, un valor p pequeño indica evidencia contra la igualdad de la c
 4. `summary(modelo_contrastes, split = ...)` muestra la descomposición del ANOVA.
 5. `glht()` proporciona la estimación y la prueba inferencial de cada contraste.
 
-La conclusión sustantiva debe completarse con los valores obtenidos al compilar el documento y con el contexto agronómico del experimento.
-
-
-Para generar el archivo que GitHub Pages utilizará como página de inicio, ejecuta el siguiente comando desde la carpeta del proyecto. El parámetro `output_file` cambia el nombre del HTML a `index.html`.
-
-```{r publicar, eval=FALSE}
-rmarkdown::render(
-  "contrastes_arroz.Rmd",
-  output_format = "html_document",
-  output_file = "index.html"
-)
-```
