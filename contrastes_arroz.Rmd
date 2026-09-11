@@ -225,7 +225,6 @@ En el resultado, un valor p pequeño indica evidencia contra la igualdad de la c
 
 La conclusión sustantiva debe completarse con los valores obtenidos al compilar el documento y con el contexto agronómico del experimento.
 
-# Publicación en GitHub Pages
 
 Para generar el archivo que GitHub Pages utilizará como página de inicio, ejecuta el siguiente comando desde la carpeta del proyecto. El parámetro `output_file` cambia el nombre del HTML a `index.html`.
 
