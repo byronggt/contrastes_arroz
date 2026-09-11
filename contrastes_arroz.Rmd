@@ -1,7 +1,6 @@
 ---
 title: "ANOVA y contrastes ortogonales para la producción de arroz"
 author: "Dr. Byron González"
-date: "`r Sys.Date()`"
 output:
   html_document:
     toc: true
